@@ -237,6 +237,7 @@ namespace PubSub.Tests
             TcpClient client = new TcpClient();
             // verification
             client.CheckConnection(TestHost);
+            loggerCalled.Should().BeTrue();
 
         }
 
