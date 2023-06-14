@@ -21,6 +21,8 @@ namespace PubSub.Server.TCPServer
         private CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();
 
         internal ConcurrentDictionary<string, List<Socket>> _channels = new ConcurrentDictionary<string, List<Socket>>();
+        internal ConcurrentDictionary<string, object> _lockObjects = new ConcurrentDictionary<string, object>();
+        private object _lockChannels = new object();
 
         public TCPServer(Action<IChannelServerConfiguration> configuration = null)
         {
@@ -37,7 +39,7 @@ namespace PubSub.Server.TCPServer
             _logger?.Info($"{nameof(TCPServer)}: Initialization started...");
 
             IPEndPoint endPoint = new IPEndPoint(IPAddress.Any, _configuration.Port);
-            _tcpServer = new Socket( endPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+            _tcpServer = new Socket(endPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
             _tcpServer.Bind(endPoint);
 
             Task.Run(ManageClient, _cancellationTokenSource.Token);
@@ -89,7 +91,7 @@ namespace PubSub.Server.TCPServer
                 var numOfBytes = clientSocket.Receive(dataBuffer, SocketFlags.None);
                 plainMessage += Encoding.UTF8.GetString(dataBuffer, 0, numOfBytes);
 
-                if(numOfBytes <= 0)
+                if (numOfBytes <= 0)
                 {
                     // The connection has been interruped by the client
                     _logger?.Info($"Client[{handle}] disconnected");
@@ -107,22 +109,32 @@ namespace PubSub.Server.TCPServer
                     var decodedMessage = TCPMessageParser.Decode(plainMessage);
                     if (decodedMessage != null)
                     {
-                        if (!_channels.TryGetValue(decodedMessage.Channel, out var clients))
+                        lock(_lockChannels)
                         {
-                            _channels.TryAdd(decodedMessage.Channel, new List<Socket>());
+                            if (!_channels.ContainsKey(decodedMessage.Channel))
+                            {
+                                _channels[decodedMessage.Channel] = new List<Socket>();
+                                _lockObjects[decodedMessage.Channel] = new object();
+                            }
                         }
+
+                        if (!_channels.TryGetValue(decodedMessage.Channel, out var subscribers))
+                            continue;
 
                         if (decodedMessage.MessageType == MessageType.Publish)
                         {
                             // I have to publish to the subscription list
-                            clients.ForEach(x => SendContentMessage(decodedMessage, x));
+                            lock (_lockObjects[decodedMessage.Channel])
+                            {
+                                subscribers.ForEach(x => SendContentMessage(decodedMessage, x));
+                            }
                         }
                         else if (decodedMessage.MessageType == MessageType.Subscribe)
                         {
-                            if (_channels.TryGetValue(decodedMessage.Channel, out var subscribers))
+                            lock (_lockObjects[decodedMessage.Channel])
                             {
                                 // I have to register it if it wasn't already registered
-                                if(!subscribers.Contains(clientSocket))
+                                if (!subscribers.Contains(clientSocket))
                                     subscribers.Add(clientSocket);
                             }
                         }

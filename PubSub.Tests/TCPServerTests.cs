@@ -12,6 +12,7 @@ namespace PubSub.Tests
     [TestClass]
     public class TCPServerTests
     {
+        private string _messageContent = "MessageContent";
         private const string TestHost = "127.0.0.1";
         private IPubSubLogger _logger;
         private TCPServer _server;
@@ -36,11 +37,10 @@ namespace PubSub.Tests
             // setup
             _server = new TCPServer();
             _server.Init();
-            // execute
+            // execution
             TcpClient client = new TcpClient();
-            client.Connect(TestHost, TCPServerConfiguration.StandardPort);
-            // check
-            client.Connected.Should().BeTrue();
+            // verification
+            client.CheckConnection(TestHost);
         }
 
         [TestMethod]
@@ -51,11 +51,10 @@ namespace PubSub.Tests
             _server = new TCPServer(cfg => cfg.Port = newPort);
             _server.Init();
 
-            // execute
+            // execution
             TcpClient client = new TcpClient();
-            client.Connect(TestHost, newPort);
-            // check
-            client.Connected.Should().BeTrue();
+            // verification
+            client.CheckConnection(TestHost, newPort);
         }
 
         [TestMethod]
@@ -65,42 +64,42 @@ namespace PubSub.Tests
             bool loggerCalled = false;
             var loggerMoq = new Mock<IPubSubLogger>();
             loggerMoq.Setup(p => p.Info(It.IsAny<string>())).Callback(() => loggerCalled = true);
-            // execute
+            // execution
             _server = new TCPServer(cfg =>
             {
                 cfg.Logger = loggerMoq.Object;
             });
             _server.Init();
-            // check
+            // verification
             loggerCalled.Should().BeTrue();
         }
 
         [TestMethod]
         public void A_publish_message_should_create_the_correct_channel()
         {
-            // execute
+            // setup
+            var channel = "TEST";
             _server = new TCPServer(cfg =>
             {
                 cfg.Logger = _logger;
             });
             _server.Init();
-            // check
             TcpClient client = new TcpClient();
-            client.Connect(TestHost, TCPServerConfiguration.StandardPort);
-            // check
-            client.Connected.Should().BeTrue();
-            var channel = "TEST";
-            var sendingBytes = Encoding.UTF8.GetBytes(TCPMessageParser.CreatePublishMessage(channel, "test"));
-            client.GetStream().Write(sendingBytes, 0, sendingBytes.Length);
+            client.CheckConnection(TestHost);
 
-            Thread.Sleep(1000);
+            // execution
+            client.SendPublish(channel, _messageContent);
+
+            // verification
+            client.CheckAck();
             _server._channels.Keys.Should().HaveCount(1);
         }
+
 
         [TestMethod]
         public void A_subscription_message_should_create_the_correct_channel_and_receive_the_publish()
         {
-            // execute
+            // setup
             _server = new TCPServer(cfg =>
             {
                 cfg.Logger = _logger;
@@ -108,37 +107,28 @@ namespace PubSub.Tests
             _server.Init();
             // check
             TcpClient client = new TcpClient();
-            client.Connect(TestHost, TCPServerConfiguration.StandardPort);
+            client.CheckConnection(TestHost);
             // check
-            client.Connected.Should().BeTrue();
             var channel = "TEST";
-            var sendingBytes = Encoding.UTF8.GetBytes(TCPMessageParser.CreateSubscribeMessage(channel));
-            client.GetStream().Write(sendingBytes, 0, sendingBytes.Length);
-
-            Thread.Sleep(1000);
+            client.SendSubscription(channel);
+            client.CheckAck();
             _server._channels.Keys.Should().HaveCount(1);
 
             TcpClient publishClient = new TcpClient();
-            publishClient.Connect(TestHost, TCPServerConfiguration.StandardPort);
-            // check
-            publishClient.Connected.Should().BeTrue();
-            var publishingBytes = Encoding.UTF8.GetBytes(TCPMessageParser.CreatePublishMessage(channel, "test"));
-            publishClient.GetStream().Write(publishingBytes, 0, publishingBytes.Length);
+            publishClient.CheckConnection(TestHost);
 
-            Thread.Sleep(1000);
-            client.ReceiveBufferSize.Should().BeGreaterThan(0);
-            byte[] received = new byte[client.ReceiveBufferSize];
-            client.GetStream().Read(received, 0, client.ReceiveBufferSize);
-            string result = Encoding.UTF8.GetString(received);
-            result = result.Substring(0, result.IndexOf('\0'));
-            result.Length.Should().BeGreaterThan(0);
-            _logger.Info($"Received {result}");
+            publishClient.SendPublish(channel, _messageContent);
+            publishClient.CheckAck();
+
+            client.CheckContent(_messageContent);
         }
+
 
         [TestMethod]
         public void Multiple_subscriptions_should_receive_the_same_publish()
         {
             // execute
+            var channel = "TEST";
             _server = new TCPServer(cfg =>
             {
                 cfg.Logger = _logger;
@@ -146,51 +136,35 @@ namespace PubSub.Tests
             _server.Init();
             // check
             TcpClient client = new TcpClient();
-            client.Connect(TestHost, TCPServerConfiguration.StandardPort);
-            // check
-            client.Connected.Should().BeTrue();
-            var channel = "TEST";
-            var sendingBytes = Encoding.UTF8.GetBytes(TCPMessageParser.CreateSubscribeMessage(channel));
-            client.GetStream().Write(sendingBytes, 0, sendingBytes.Length);
+            client.CheckConnection(TestHost);
+            client.SendSubscription(channel);
 
             TcpClient client2 = new TcpClient();
-            client2.Connect(TestHost, TCPServerConfiguration.StandardPort);
-            // check
-            client2.Connected.Should().BeTrue();
-            client2.GetStream().Write(sendingBytes, 0, sendingBytes.Length);
+            client2.CheckConnection(TestHost);
+            client2.SendSubscription(channel);
 
-            Thread.Sleep(1000);
+            client.CheckAck();
+            client2.CheckAck();
             _server._channels.Keys.Should().HaveCount(1);
+            _server._channels.Values.First().Should().HaveCount(2);
 
             TcpClient publishClient = new TcpClient();
-            publishClient.Connect(TestHost, TCPServerConfiguration.StandardPort);
-            // check
-            publishClient.Connected.Should().BeTrue();
-            var publishingBytes = Encoding.UTF8.GetBytes(TCPMessageParser.CreatePublishMessage(channel, "test"));
-            publishClient.GetStream().Write(publishingBytes, 0, publishingBytes.Length);
+            publishClient.CheckConnection(TestHost);
 
-            Thread.Sleep(1000);
-            client.ReceiveBufferSize.Should().BeGreaterThan(0);
-            byte[] received = new byte[client.ReceiveBufferSize];
-            client.GetStream().Read(received, 0, client.ReceiveBufferSize);
-            string result = Encoding.UTF8.GetString(received);
-            result = result.Substring(0, result.IndexOf('\0'));
-            result.Length.Should().BeGreaterThan(0);
-            _logger.Info($"Received {result} for client 1");
+            publishClient.SendPublish(channel, _messageContent);
+            publishClient.CheckAck();
 
-            client2.ReceiveBufferSize.Should().BeGreaterThan(0);
-            received = new byte[client2.ReceiveBufferSize];
-            client2.GetStream().Read(received, 0, client2.ReceiveBufferSize);
-            result = Encoding.UTF8.GetString(received);
-            result = result.Substring(0, result.IndexOf('\0'));
-            result.Length.Should().BeGreaterThan(0);
-            _logger.Info($"Received {result} for client 2");
+            client.CheckContent(_messageContent);
+            client2.CheckContent(_messageContent);
+
         }
 
         [TestMethod]
         public void Multiple_subscriptions_of_the_same_client_should_be_possible()
         {
             // execute
+            var channel = "TEST";
+            var secondChannel = "SECONDTEST";
             _server = new TCPServer(cfg =>
             {
                 cfg.Logger = _logger;
@@ -198,21 +172,14 @@ namespace PubSub.Tests
             _server.Init();
             // check
             TcpClient client = new TcpClient();
-            client.Connect(TestHost, TCPServerConfiguration.StandardPort);
-            // check
-            client.Connected.Should().BeTrue();
-            var channel = "TEST";
-            var sendingBytes = Encoding.UTF8.GetBytes(TCPMessageParser.CreateSubscribeMessage(channel));
-            client.GetStream().Write(sendingBytes, 0, sendingBytes.Length);
+            client.CheckConnection(TestHost);
+            client.SendSubscription(channel);
 
-            client.ReceiveBufferSize.Should().BeGreaterThan(0);
-            var received = new byte[client.ReceiveBufferSize];
-            client.GetStream().Read(received, 0, client.ReceiveBufferSize);
+            client.CheckAck();
 
-            sendingBytes = Encoding.UTF8.GetBytes(TCPMessageParser.CreateSubscribeMessage("SECONDTEST"));
-            client.GetStream().Write(sendingBytes, 0, sendingBytes.Length);
+            client.SendSubscription(secondChannel);
+            client.CheckAck();
 
-            Thread.Sleep(1000);
             _server._channels.Keys.Should().HaveCount(2);
         }
 
@@ -220,6 +187,7 @@ namespace PubSub.Tests
         public void Client_can_be_subscribed_two_times_same_channel_without_repetition_on_clients_list()
         {
             // execute
+            var channel = "TEST";
             _server = new TCPServer(cfg =>
             {
                 cfg.Logger = _logger;
@@ -227,22 +195,13 @@ namespace PubSub.Tests
             _server.Init();
             // check
             TcpClient client = new TcpClient();
-            client.Connect(TestHost, TCPServerConfiguration.StandardPort);
-            // check
-            client.Connected.Should().BeTrue();
-            var channel = "TEST";
-            var sendingBytes = Encoding.UTF8.GetBytes(TCPMessageParser.CreateSubscribeMessage(channel));
-            client.GetStream().Write(sendingBytes, 0, sendingBytes.Length);
+            client.CheckConnection(TestHost);
+            client.SendSubscription(channel);
 
-            client.ReceiveBufferSize.Should().BeGreaterThan(0);
-            var received = new byte[client.ReceiveBufferSize];
-            client.GetStream().Read(received, 0, client.ReceiveBufferSize);
+            client.CheckAck();
 
-            client.GetStream().Write(sendingBytes, 0, sendingBytes.Length);
-
-            client.ReceiveBufferSize.Should().BeGreaterThan(0);
-            received = new byte[client.ReceiveBufferSize];
-            client.GetStream().Read(received, 0, client.ReceiveBufferSize);
+            client.SendSubscription(channel);
+            client.CheckAck();
 
             _server._channels.Keys.Should().HaveCount(1);
             _server._channels.Values.First().Should().HaveCount(1);
@@ -257,5 +216,6 @@ namespace PubSub.Tests
 
         // if there is time, grpc (only integration)
 
+        
     }
 }
