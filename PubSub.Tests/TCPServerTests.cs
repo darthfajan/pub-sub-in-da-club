@@ -15,7 +15,7 @@ namespace PubSub.Tests
         private string _messageContent = "MessageContent";
         private const string TestHost = "127.0.0.1";
         private IPubSubLogger _logger;
-        private TCPServer _server;
+        private BasicTCPServer _server;
 
         public TestContext TestContext { get; set; }
 
@@ -35,7 +35,7 @@ namespace PubSub.Tests
         public void TCPServer_should_be_created_without_logger_and_standard_settings()
         {
             // setup
-            _server = new TCPServer();
+            _server = new BasicTCPServer();
             _server.Init();
             // execution
             TcpClient client = new TcpClient();
@@ -48,7 +48,7 @@ namespace PubSub.Tests
         {
             // setup
             var newPort = 4444;
-            _server = new TCPServer(cfg => cfg.Port = newPort);
+            _server = new BasicTCPServer(cfg => cfg.Port = newPort);
             _server.Init();
 
             // execution
@@ -65,7 +65,7 @@ namespace PubSub.Tests
             var loggerMoq = new Mock<IPubSubLogger>();
             loggerMoq.Setup(p => p.Info(It.IsAny<string>())).Callback(() => loggerCalled = true);
             // execution
-            _server = new TCPServer(cfg =>
+            _server = new BasicTCPServer(cfg =>
             {
                 cfg.Logger = loggerMoq.Object;
             });
@@ -79,7 +79,7 @@ namespace PubSub.Tests
         {
             // setup
             var channel = "TEST";
-            _server = new TCPServer(cfg =>
+            _server = new BasicTCPServer(cfg =>
             {
                 cfg.Logger = _logger;
             });
@@ -100,7 +100,7 @@ namespace PubSub.Tests
         public void A_subscription_message_should_create_the_correct_channel_and_receive_the_publish()
         {
             // setup
-            _server = new TCPServer(cfg =>
+            _server = new BasicTCPServer(cfg =>
             {
                 cfg.Logger = _logger;
             });
@@ -129,7 +129,7 @@ namespace PubSub.Tests
         {
             // execute
             var channel = "TEST";
-            _server = new TCPServer(cfg =>
+            _server = new BasicTCPServer(cfg =>
             {
                 cfg.Logger = _logger;
             });
@@ -165,7 +165,7 @@ namespace PubSub.Tests
             // execute
             var channel = "TEST";
             var secondChannel = "SECONDTEST";
-            _server = new TCPServer(cfg =>
+            _server = new BasicTCPServer(cfg =>
             {
                 cfg.Logger = _logger;
             });
@@ -188,7 +188,7 @@ namespace PubSub.Tests
         {
             // execute
             var channel = "TEST";
-            _server = new TCPServer(cfg =>
+            _server = new BasicTCPServer(cfg =>
             {
                 cfg.Logger = _logger;
             });
@@ -207,6 +207,39 @@ namespace PubSub.Tests
             _server._channels.Values.First().Should().HaveCount(1);
         }
 
+        [TestMethod]
+        public void Server_factory_should_create_a_valid_server()
+        {
+            // setup
+            using var server = ChannelServerFactory.CreateServer();
+            server.Should().BeOfType(typeof(BasicTCPServer));
+            server.Init();
+            // execution
+            TcpClient client = new TcpClient();
+            // verification
+            client.CheckConnection(TestHost);
+        }
+
+        [TestMethod]
+        public void Server_factory_should_create_a_valid_server_with_a_config()
+        {
+            // setup
+            bool loggerCalled = false;
+            var loggerMoq = new Mock<IPubSubLogger>();
+            loggerMoq.Setup(p => p.Info(It.IsAny<string>())).Callback(() => loggerCalled = true);
+            using var server = ChannelServerFactory.CreateServer(configuration: cfg =>
+            {
+                cfg.Logger = loggerMoq.Object;
+            });
+            server.Should().BeOfType(typeof(BasicTCPServer));
+            server.Init();
+            // execution
+            TcpClient client = new TcpClient();
+            // verification
+            client.CheckConnection(TestHost);
+
+        }
+
         // TODO:
         // test client
         // Integration tests
@@ -216,6 +249,6 @@ namespace PubSub.Tests
 
         // if there is time, grpc (only integration)
 
-        
+
     }
 }

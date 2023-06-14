@@ -12,21 +12,21 @@ using System.Threading.Tasks;
 
 namespace PubSub.Server.TCPServer
 {
-    internal class TCPServer : IChannelServer
+    internal class BasicTCPServer : IChannelServer
     {
         private bool _disposed;
         private Socket _tcpServer;
         private IPubSubLogger _logger;
-        private TCPServerConfiguration _configuration;
+        private BasicTCPServerConfiguration _configuration;
         private CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();
 
         internal ConcurrentDictionary<string, List<Socket>> _channels = new ConcurrentDictionary<string, List<Socket>>();
         internal ConcurrentDictionary<string, object> _lockObjects = new ConcurrentDictionary<string, object>();
         private object _lockChannels = new object();
 
-        public TCPServer(Action<IChannelServerConfiguration> configuration = null)
+        public BasicTCPServer(Action<IChannelServerConfiguration> configuration = null)
         {
-            _configuration = new TCPServerConfiguration();
+            _configuration = new BasicTCPServerConfiguration();
             configuration?.Invoke(_configuration);
             _logger = _configuration.Logger;
         }
@@ -34,16 +34,16 @@ namespace PubSub.Server.TCPServer
         public void Init()
         {
             if (_disposed)
-                throw new ObjectDisposedException(nameof(TCPServer));
+                throw new ObjectDisposedException(nameof(BasicTCPServer));
 
-            _logger?.Info($"{nameof(TCPServer)}: Initialization started...");
+            _logger?.Info($"{nameof(BasicTCPServer)}: Initialization started...");
 
             IPEndPoint endPoint = new IPEndPoint(IPAddress.Any, _configuration.Port);
             _tcpServer = new Socket(endPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
             _tcpServer.Bind(endPoint);
 
             Task.Run(ManageClient, _cancellationTokenSource.Token);
-            _logger?.Info($"{nameof(TCPServer)}: Initialization finished...");
+            _logger?.Info($"{nameof(BasicTCPServer)}: Initialization finished...");
         }
 
         public void Dispose()
