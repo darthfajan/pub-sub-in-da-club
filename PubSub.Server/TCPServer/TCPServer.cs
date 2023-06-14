@@ -5,6 +5,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -41,6 +42,27 @@ namespace PubSub.Server.TCPServer
 
             Task.Run(ManageClient, _cancellationTokenSource.Token);
             _logger?.Info($"{nameof(TCPServer)}: Initialization finished...");
+        }
+
+        public void Dispose()
+        {
+            if (_disposed)
+                return;
+
+            _disposed = true;
+
+            try
+            {
+                _tcpServer?.Close();
+                _cancellationTokenSource.Cancel();
+                Thread.Sleep(100);
+
+                _tcpServer?.Dispose();
+                _tcpServer = null;
+            }
+            catch
+            {
+            }
         }
 
         private void ManageClient()
@@ -99,12 +121,16 @@ namespace PubSub.Server.TCPServer
                         {
                             if (_channels.TryGetValue(decodedMessage.Channel, out var subscribers))
                             {
-                                // I have to register it
-                                subscribers.Add(clientSocket);
+                                // I have to register it if it wasn't already registered
+                                if(!subscribers.Contains(clientSocket))
+                                    subscribers.Add(clientSocket);
                             }
                         }
                         SendAckMessage(clientSocket);
-
+                    }
+                    else
+                    {
+                        SendErrorMessage(clientSocket);
                     }
                     // reset the message info
                     plainMessage = string.Empty;
@@ -130,25 +156,14 @@ namespace PubSub.Server.TCPServer
             clientSocket.Send(Encoding.UTF8.GetBytes(contentMessage));
         }
 
-        public void Dispose()
+        private void SendErrorMessage(Socket clientSocket)
         {
-            if (_disposed)
+            var contentMessage = TCPMessageParser.CreateErrorMessage();
+            if (contentMessage is null)
                 return;
 
-            _disposed = true;
-
-            try
-            {
-                _tcpServer?.Close();
-                _cancellationTokenSource.Cancel();
-                Thread.Sleep(100);
-
-                _tcpServer?.Dispose();
-                _tcpServer = null;
-            }
-            catch
-            {
-            }
+            clientSocket.Send(Encoding.UTF8.GetBytes(contentMessage));
         }
+
     }
 }

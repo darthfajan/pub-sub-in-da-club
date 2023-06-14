@@ -216,9 +216,39 @@ namespace PubSub.Tests
             _server._channels.Keys.Should().HaveCount(2);
         }
 
+        [TestMethod]
+        public void Client_can_be_subscribed_two_times_same_channel_without_repetition_on_clients_list()
+        {
+            // execute
+            _server = new TCPServer(cfg =>
+            {
+                cfg.Logger = _logger;
+            });
+            _server.Init();
+            // check
+            TcpClient client = new TcpClient();
+            client.Connect(TestHost, TCPServerConfiguration.StandardPort);
+            // check
+            client.Connected.Should().BeTrue();
+            var channel = "TEST";
+            var sendingBytes = Encoding.UTF8.GetBytes(TCPMessageParser.CreateSubscribeMessage(channel));
+            client.GetStream().Write(sendingBytes, 0, sendingBytes.Length);
+
+            client.ReceiveBufferSize.Should().BeGreaterThan(0);
+            var received = new byte[client.ReceiveBufferSize];
+            client.GetStream().Read(received, 0, client.ReceiveBufferSize);
+
+            client.GetStream().Write(sendingBytes, 0, sendingBytes.Length);
+
+            client.ReceiveBufferSize.Should().BeGreaterThan(0);
+            received = new byte[client.ReceiveBufferSize];
+            client.GetStream().Read(received, 0, client.ReceiveBufferSize);
+
+            _server._channels.Keys.Should().HaveCount(1);
+            _server._channels.Values.First().Should().HaveCount(1);
+        }
+
         // TODO:
-        // test disconnection
-        // test big message
         // test client
         // Integration tests
         // Refactoring
