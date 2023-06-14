@@ -9,6 +9,7 @@ namespace PubSub.Shared.TCP
         public const char PublishEncoding = 'P';
         public const char SubscribeEncoding = 'S';
         public const char ContentEncoding = 'C';
+        public const char ACKEncoding = 'C';
         public const char EncodingSeparator = '|';
         public const string EndEncoodingTerminator = "\r\n";
 
@@ -70,5 +71,7 @@ namespace PubSub.Shared.TCP
         {
             return $"{ContentEncoding}{EncodingSeparator}{channel.ToUpperInvariant()}{EncodingSeparator}{message}{EndEncoodingTerminator}";
         }
+
+        public static string CreateAckMessage() => $"{ACKEncoding}{EncodingSeparator}{EncodingSeparator}{EndEncoodingTerminator}";
     }
 }

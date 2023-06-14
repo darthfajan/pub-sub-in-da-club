@@ -13,10 +13,10 @@ namespace PubSub.Server.TCPServer
 {
     internal class TCPServer : IChannelServer
     {
-        private bool disposed;
+        private bool _disposed;
         private Socket _tcpServer;
-        private TCPServerConfiguration _configuration;
         private IPubSubLogger _logger;
+        private TCPServerConfiguration _configuration;
         private CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();
 
         internal ConcurrentDictionary<string, List<Socket>> _channels = new ConcurrentDictionary<string, List<Socket>>();
@@ -30,48 +30,59 @@ namespace PubSub.Server.TCPServer
 
         public void Init()
         {
-            _logger?.Info($"{nameof(TCPServer)}: Initialization started...");
-            IPEndPoint localEndPoint = new IPEndPoint(IPAddress.Any, _configuration.Port);
-            _tcpServer = new Socket(
-                localEndPoint.AddressFamily,
-                SocketType.Stream,
-                ProtocolType.Tcp);
-            _tcpServer.Bind(localEndPoint);
+            if (_disposed)
+                throw new ObjectDisposedException(nameof(TCPServer));
 
-            Task.Run(ManageClientsAsync, _cancellationTokenSource.Token);
+            _logger?.Info($"{nameof(TCPServer)}: Initialization started...");
+
+            IPEndPoint endPoint = new IPEndPoint(IPAddress.Any, _configuration.Port);
+            _tcpServer = new Socket( endPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+            _tcpServer.Bind(endPoint);
+
+            Task.Run(ManageClient, _cancellationTokenSource.Token);
             _logger?.Info($"{nameof(TCPServer)}: Initialization finished...");
         }
 
-        private async Task ManageClientsAsync()
+        private void ManageClient()
         {
             _tcpServer.Listen(100);
 
-
             while (!_cancellationTokenSource.Token.IsCancellationRequested)
             {
-                var handler = _tcpServer.Accept();
+                var newClient = _tcpServer.Accept();
 
-                Task.Run(async () => await HandleNewConnectionAsync(handler));
+                Task.Run(() => HandleNewClient(newClient));
             }
 
         }
 
-        private async Task HandleNewConnectionAsync(Socket handler)
+        private void HandleNewClient(Socket clientSocket)
         {
+            var handle = clientSocket.Handle;
+            _logger?.Info($"New Client[{handle}] connected");
+            string plainMessage = string.Empty;
             while (!_cancellationTokenSource.Token.IsCancellationRequested)
             {
-                // Receive message.
-                var buffer = new byte[1_024];
-                var received = handler.Receive(buffer, SocketFlags.None);
-                var response = Encoding.UTF8.GetString(buffer, 0, received);
+                var dataBuffer = new byte[1024];
+                var numOfBytes = clientSocket.Receive(dataBuffer, SocketFlags.None);
+                plainMessage += Encoding.UTF8.GetString(dataBuffer, 0, numOfBytes);
 
-                var eom = "\r\n";
-                if (response.IndexOf(eom) > -1 /* is end of message */)
+                if(numOfBytes <= 0)
                 {
-                    Console.WriteLine(
-                        $"Socket server received message: \"{response.Replace(eom, "")}\"");
+                    // The connection has been interruped by the client
+                    _logger?.Info($"Client[{handle}] disconnected");
+                    break;
+                }
 
-                    var decodedMessage = TCPMessageParser.Decode(response);
+                var messageTerminator = "\r\n";
+                if (plainMessage.IndexOf(messageTerminator) > -1)
+                {
+                    // The message is complete
+                    if (plainMessage.IndexOf('\0') > -1)
+                        plainMessage = plainMessage.Substring(0, plainMessage.IndexOf('\0'));
+
+                    _logger?.Info($"Received message: {plainMessage} from Client[{handle}]");
+                    var decodedMessage = TCPMessageParser.Decode(plainMessage);
                     if (decodedMessage != null)
                     {
                         if (!_channels.TryGetValue(decodedMessage.Channel, out var clients))
@@ -81,36 +92,57 @@ namespace PubSub.Server.TCPServer
 
                         if (decodedMessage.MessageType == MessageType.Publish)
                         {
-                            clients.ForEach(x => SendMessage(decodedMessage, x));
+                            // I have to publish to the subscription list
+                            clients.ForEach(x => SendContentMessage(decodedMessage, x));
                         }
                         else if (decodedMessage.MessageType == MessageType.Subscribe)
                         {
                             if (_channels.TryGetValue(decodedMessage.Channel, out var subscribers))
                             {
-                                subscribers.Add(handler);
+                                // I have to register it
+                                subscribers.Add(clientSocket);
                             }
                         }
+                        SendAckMessage(clientSocket);
+
                     }
+                    // reset the message info
+                    plainMessage = string.Empty;
                 }
-                // Sample output:
-                //    Socket server received message: "Hi friends 👋!"
-                //    Socket server sent acknowledgment: "<|ACK|>"
             }
         }
 
-        private void SendMessage(MessageInfo decodedMessage, Socket x)
+        private void SendContentMessage(MessageInfo decodedMessage, Socket clientSocket)
         {
             var contentMessage = TCPMessageParser.CreateContentMessage(decodedMessage.Channel, decodedMessage.Message);
-            x.Send(Encoding.UTF8.GetBytes(contentMessage));
+            if (contentMessage is null)
+                return;
+
+            clientSocket.Send(Encoding.UTF8.GetBytes(contentMessage));
+        }
+
+        private void SendAckMessage(Socket clientSocket)
+        {
+            var contentMessage = TCPMessageParser.CreateAckMessage();
+            if (contentMessage is null)
+                return;
+
+            clientSocket.Send(Encoding.UTF8.GetBytes(contentMessage));
         }
 
         public void Dispose()
         {
-            if (disposed)
+            if (_disposed)
                 return;
+
+            _disposed = true;
+
             try
             {
                 _tcpServer?.Close();
+                _cancellationTokenSource.Cancel();
+                Thread.Sleep(100);
+
                 _tcpServer?.Dispose();
                 _tcpServer = null;
             }

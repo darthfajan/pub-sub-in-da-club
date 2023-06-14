@@ -205,6 +205,10 @@ namespace PubSub.Tests
             var sendingBytes = Encoding.UTF8.GetBytes(TCPMessageParser.CreateSubscribeMessage(channel));
             client.GetStream().Write(sendingBytes, 0, sendingBytes.Length);
 
+            client.ReceiveBufferSize.Should().BeGreaterThan(0);
+            var received = new byte[client.ReceiveBufferSize];
+            client.GetStream().Read(received, 0, client.ReceiveBufferSize);
+
             sendingBytes = Encoding.UTF8.GetBytes(TCPMessageParser.CreateSubscribeMessage("SECONDTEST"));
             client.GetStream().Write(sendingBytes, 0, sendingBytes.Length);
 
