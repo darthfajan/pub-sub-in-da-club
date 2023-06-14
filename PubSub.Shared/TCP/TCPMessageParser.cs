@@ -9,7 +9,8 @@ namespace PubSub.Shared.TCP
         public const char PublishEncoding = 'P';
         public const char SubscribeEncoding = 'S';
         public const char ContentEncoding = 'C';
-        public const char ACKEncoding = 'C';
+        public const char ACKEncoding = 'A';
+        public const char ErrorEncoding = 'E';
         public const char EncodingSeparator = '|';
         public const string EndEncoodingTerminator = "\r\n";
 
@@ -31,6 +32,14 @@ namespace PubSub.Shared.TCP
 
             return $"{SubscribeEncoding}{EncodingSeparator}{channel.ToUpperInvariant()}{EncodingSeparator}{EndEncoodingTerminator}";
         }
+
+        public static string CreateContentMessage(string channel, string message)
+        {
+            return $"{ContentEncoding}{EncodingSeparator}{channel.ToUpperInvariant()}{EncodingSeparator}{message}{EndEncoodingTerminator}";
+        }
+
+        public static string CreateAckMessage() => $"{ACKEncoding}{EncodingSeparator}{EncodingSeparator}{EndEncoodingTerminator}";
+        public static string CreateErrorMessage() => $"{ErrorEncoding}{EncodingSeparator}{EncodingSeparator}{EndEncoodingTerminator}";
 
         public static MessageInfo Decode(string encodedMessage)
         {
@@ -66,12 +75,5 @@ namespace PubSub.Shared.TCP
             };
 
         }
-
-        public static string CreateContentMessage(string channel, string message)
-        {
-            return $"{ContentEncoding}{EncodingSeparator}{channel.ToUpperInvariant()}{EncodingSeparator}{message}{EndEncoodingTerminator}";
-        }
-
-        public static string CreateAckMessage() => $"{ACKEncoding}{EncodingSeparator}{EncodingSeparator}{EndEncoodingTerminator}";
     }
 }

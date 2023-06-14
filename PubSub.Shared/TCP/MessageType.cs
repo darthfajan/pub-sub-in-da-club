@@ -11,6 +11,7 @@ namespace PubSub.Shared.TCP
         Subscribe,
         Content,
         Ack,
+        Error
     }
     public static class MessageTypeExtensions
     {
@@ -26,6 +27,8 @@ namespace PubSub.Shared.TCP
                     return TCPMessageParser.ContentEncoding;
                 case MessageType.Ack:
                     return TCPMessageParser.ACKEncoding;
+                case MessageType.Error:
+                    return TCPMessageParser.ErrorEncoding;
             }
 
             throw new ArgumentException("Invalid value", nameof(messageType));
@@ -41,6 +44,8 @@ namespace PubSub.Shared.TCP
                 return MessageType.Content;
             if (encodedType.Equals(TCPMessageParser.ACKEncoding.ToString()))
                 return MessageType.Ack;
+            if (encodedType.Equals(TCPMessageParser.ErrorEncoding.ToString()))
+                return MessageType.Error;
 
             return MessageType.None;
         }
