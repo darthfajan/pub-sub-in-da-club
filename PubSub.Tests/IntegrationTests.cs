@@ -64,14 +64,14 @@ namespace PubSub.Tests
             server.Init();
 
             // subscribe to channels
-            client1.Subscribe(argument1, client1SubscriberMoq.Object);
-            client1.Subscribe(commonArgument, client1SubscriberMoq.Object);
-            client2.Subscribe(argument2, client2SubscriberMoq.Object);
-            client2.Subscribe(commonArgument, client2SubscriberMoq.Object);
+            client1.Subscribe(argument1, client1SubscriberMoq.Object).Should().BeTrue();
+            client1.Subscribe(commonArgument, client1SubscriberMoq.Object).Should().BeTrue();
+            client2.Subscribe(argument2, client2SubscriberMoq.Object).Should().BeTrue();
+            client2.Subscribe(commonArgument, client2SubscriberMoq.Object).Should().BeTrue();
 
             // the first message should arrive only to the first client
             var firstMessage = "The first message";
-            client2.Publish(argument1, firstMessage);
+            client2.Publish(argument1, firstMessage).Should().BeTrue();
             messageArrivedOnClient1.WaitOne(1000);
             client1ContentArrived.Should().Be(firstMessage);
             messageArrivedOnClient2.WaitOne(1000); // this will slow down the test, but allows to be sure that nothing arrives to the second client

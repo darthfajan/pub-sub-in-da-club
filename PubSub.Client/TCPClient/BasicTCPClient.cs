@@ -14,9 +14,10 @@ namespace PubSub.Client.TCPClient
 {
     internal class BasicTCPClient : IChannelClient
     {
-        private BasicTCPClientConfiguration _configuration;
         private bool _disposed;
+        IPEndPoint _serverEndPoint;
         private IPubSubLogger _logger;
+        private BasicTCPClientConfiguration _configuration;
         private CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();
         private ConcurrentDictionary<string,List<IChannelSubscriber>> _subscriptions = new ConcurrentDictionary<string, List<IChannelSubscriber>>();
 
@@ -25,6 +26,10 @@ namespace PubSub.Client.TCPClient
             _configuration = new BasicTCPClientConfiguration();
             configuration?.Invoke(_configuration);
             _logger = _configuration.Logger;
+
+            IPHostEntry ipHostInfo = Dns.GetHostEntry(_configuration.Host);
+            IPAddress ipAddress = ipHostInfo.AddressList.FirstOrDefault(x => x.AddressFamily == AddressFamily.InterNetwork);
+            _serverEndPoint = new IPEndPoint(ipAddress, _configuration.Port);
         }
 
         public void Dispose()
@@ -40,12 +45,11 @@ namespace PubSub.Client.TCPClient
 
         public bool Publish(string channel, string message)
         {
+            bool publishResult = true;
             try
             {
-                IPHostEntry ipHostInfo = Dns.GetHostEntry(_configuration.Host);
-                IPAddress ipAddress = ipHostInfo.AddressList.FirstOrDefault(x => x.AddressFamily == AddressFamily.InterNetwork);
-                IPEndPoint endPoint = new IPEndPoint(ipAddress, _configuration.Port);
-                using (var publishingClient = new Socket(endPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp))
+                
+                using (var publishingClient = new Socket(_serverEndPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp))
                 {
                     publishingClient.Connect(_configuration.Host, _configuration.Port);
                     if (!publishingClient.Connected)
@@ -58,16 +62,22 @@ namespace PubSub.Client.TCPClient
                     var sendingBytes = Encoding.UTF8.GetBytes(encodedMessage);
                     publishingClient.Send(sendingBytes);
 
+                    var answer = WaitForNextMessage(publishingClient);
+                    if (answer is null || answer.MessageType == MessageType.Error)
+                    {
+                        publishResult = false;
+                    }
+
                     publishingClient.Close();
                 }
             }
             catch (Exception ex)
             {
                 _logger?.Error($"Exception on publishing {message} on channel {channel}. Exception message: {ex}");
-                return false;
+                publishResult = false;
             }
 
-            return true;
+            return publishResult;
         }
 
         public bool Subscribe(string channel, IChannelSubscriber subscriber)
@@ -83,10 +93,7 @@ namespace PubSub.Client.TCPClient
                 return true;
             }
 
-            IPHostEntry ipHostInfo = Dns.GetHostEntry(_configuration.Host);
-            IPAddress ipAddress = ipHostInfo.AddressList.FirstOrDefault(x => x.AddressFamily == AddressFamily.InterNetwork);
-            IPEndPoint endPoint = new IPEndPoint(ipAddress, _configuration.Port);
-            var subscription = new Socket(endPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+            var subscription = new Socket(_serverEndPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
             subscription.Connect(_configuration.Host, _configuration.Port);
             if (!subscription.Connected)
             {
