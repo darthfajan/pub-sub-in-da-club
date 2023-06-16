@@ -24,6 +24,10 @@ namespace PubSub.Server.TCPServer
         internal ConcurrentDictionary<string, object> _lockObjects = new ConcurrentDictionary<string, object>();
         private object _lockChannels = new object();
 
+        /// <summary>
+        /// A simple tcp server implementation
+        /// </summary>
+        /// <param name="configuration">Optional. If not specified it opens the port 6667</param>
         public BasicTCPServer(Action<IChannelServerConfiguration> configuration = null)
         {
             _configuration = new BasicTCPServerConfiguration();
@@ -31,6 +35,9 @@ namespace PubSub.Server.TCPServer
             _logger = _configuration.Logger;
         }
 
+        /// <summary>
+        /// <inheritdoc />
+        /// </summary>
         public void Init()
         {
             if (_disposed)

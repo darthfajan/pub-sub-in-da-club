@@ -5,9 +5,18 @@ using System.Text;
 
 namespace PubSub.Server
 {
+    /// <summary>
+    /// Allowa the server configuration
+    /// </summary>
     public interface IChannelServerConfiguration
     {
+        /// <summary>
+        /// Port opened by the server
+        /// </summary>
         int Port { get; set; }
+        /// <summary>
+        /// Eventual logger for debug purpose
+        /// </summary>
         IPubSubLogger Logger { get; set; }
     }
 }

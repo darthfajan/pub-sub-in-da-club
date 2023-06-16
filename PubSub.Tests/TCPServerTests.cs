@@ -105,10 +105,9 @@ namespace PubSub.Tests
                 cfg.Logger = _logger;
             });
             _server.Init();
-            // check
             TcpClient client = new TcpClient();
             client.CheckConnection(TestHost);
-            // check
+            // execution
             var channel = "TEST";
             client.SendSubscription(channel);
             client.CheckAck();
@@ -119,7 +118,7 @@ namespace PubSub.Tests
 
             publishClient.SendPublish(channel, _messageContent);
             publishClient.CheckAck();
-
+            // verification
             client.CheckContent(_messageContent);
         }
 
@@ -127,14 +126,14 @@ namespace PubSub.Tests
         [TestMethod]
         public void Multiple_subscriptions_should_receive_the_same_publish()
         {
-            // execute
+            // setup
             var channel = "TEST";
             _server = new BasicTCPServer(cfg =>
             {
                 cfg.Logger = _logger;
             });
             _server.Init();
-            // check
+            // execution
             TcpClient client = new TcpClient();
             client.CheckConnection(TestHost);
             client.SendSubscription(channel);
@@ -153,7 +152,7 @@ namespace PubSub.Tests
 
             publishClient.SendPublish(channel, _messageContent);
             publishClient.CheckAck();
-
+            // verification
             client.CheckContent(_messageContent);
             client2.CheckContent(_messageContent);
 
@@ -162,7 +161,7 @@ namespace PubSub.Tests
         [TestMethod]
         public void Multiple_subscriptions_of_the_same_client_should_be_possible()
         {
-            // execute
+            // setup
             var channel = "TEST";
             var secondChannel = "SECONDTEST";
             _server = new BasicTCPServer(cfg =>
@@ -170,7 +169,7 @@ namespace PubSub.Tests
                 cfg.Logger = _logger;
             });
             _server.Init();
-            // check
+            // execution
             TcpClient client = new TcpClient();
             client.CheckConnection(TestHost);
             client.SendSubscription(channel);
@@ -179,21 +178,21 @@ namespace PubSub.Tests
 
             client.SendSubscription(secondChannel);
             client.CheckAck();
-
+            // verification
             _server._channels.Keys.Should().HaveCount(2);
         }
 
         [TestMethod]
         public void Client_can_be_subscribed_two_times_same_channel_without_repetition_on_clients_list()
         {
-            // execute
+            // setup
             var channel = "TEST";
             _server = new BasicTCPServer(cfg =>
             {
                 cfg.Logger = _logger;
             });
             _server.Init();
-            // check
+            // execution
             TcpClient client = new TcpClient();
             client.CheckConnection(TestHost);
             client.SendSubscription(channel);
@@ -202,7 +201,7 @@ namespace PubSub.Tests
 
             client.SendSubscription(channel);
             client.CheckAck();
-
+            // verification
             _server._channels.Keys.Should().HaveCount(1);
             _server._channels.Values.First().Should().HaveCount(1);
         }
@@ -240,15 +239,6 @@ namespace PubSub.Tests
             loggerCalled.Should().BeTrue();
 
         }
-
-        // TODO:
-        // test client
-        // Integration tests
-        // Refactoring
-        // Comments
-        // Docs
-
-        // if there is time, grpc (only integration)
 
 
     }

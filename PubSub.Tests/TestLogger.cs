@@ -7,6 +7,9 @@ using System.Threading.Tasks;
 
 namespace PubSub.Tests
 {
+    /// <summary>
+    /// A test logger writing to the TestContext
+    /// </summary>
     internal class TestLogger : IPubSubLogger
     {
         private readonly TestContext _context;

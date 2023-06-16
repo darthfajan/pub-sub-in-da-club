@@ -43,6 +43,9 @@ namespace PubSub.Client.TCPClient
             _subscriptions.Clear();
         }
 
+        /// <summary>
+        /// <inheritdoc />
+        /// </summary>
         public bool Publish(string channel, string message)
         {
             bool publishResult = true;
@@ -80,6 +83,9 @@ namespace PubSub.Client.TCPClient
             return publishResult;
         }
 
+        /// <summary>
+        /// <inheritdoc />
+        /// </summary>
         public bool Subscribe(string channel, IChannelSubscriber subscriber)
         {
             if (string.IsNullOrEmpty(channel))
