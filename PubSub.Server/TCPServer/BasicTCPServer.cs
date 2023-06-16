@@ -17,6 +17,7 @@ namespace PubSub.Server.TCPServer
         private bool _disposed;
         private Socket _tcpServer;
         private IPubSubLogger _logger;
+        private IMessageParser _parser;
         private BasicTCPServerConfiguration _configuration;
         private CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();
 
@@ -33,6 +34,7 @@ namespace PubSub.Server.TCPServer
             _configuration = new BasicTCPServerConfiguration();
             configuration?.Invoke(_configuration);
             _logger = _configuration.Logger;
+            _parser = _configuration.Parser;
         }
 
         /// <summary>
@@ -116,7 +118,7 @@ namespace PubSub.Server.TCPServer
                             plainMessage = plainMessage.Substring(0, plainMessage.IndexOf('\0'));
 
                         _logger?.Info($"Received message: {plainMessage} from Client[{handle}]");
-                        var decodedMessage = TCPMessageParser.Decode(plainMessage);
+                        var decodedMessage = _parser.Decode(plainMessage);
                         if (decodedMessage != null)
                         {
                             lock (_lockChannels)
@@ -177,9 +179,9 @@ namespace PubSub.Server.TCPServer
             }
         }
 
-        private void SendContentMessage(MessageInfo decodedMessage, Socket clientSocket)
+        private void SendContentMessage(IMessageInfo decodedMessage, Socket clientSocket)
         {
-            var contentMessage = TCPMessageParser.CreateContentMessage(decodedMessage.Channel, decodedMessage.Message);
+            var contentMessage = _parser.CreateContentMessage(decodedMessage.Channel, decodedMessage.Content);
             if (contentMessage is null)
                 return;
 
@@ -188,7 +190,7 @@ namespace PubSub.Server.TCPServer
 
         private void SendAckMessage(Socket clientSocket)
         {
-            var contentMessage = TCPMessageParser.CreateAckMessage();
+            var contentMessage = _parser.CreateAckMessage();
             if (contentMessage is null)
                 return;
 
@@ -197,7 +199,7 @@ namespace PubSub.Server.TCPServer
 
         private void SendErrorMessage(Socket clientSocket)
         {
-            var contentMessage = TCPMessageParser.CreateErrorMessage();
+            var contentMessage = _parser.CreateErrorMessage();
             if (contentMessage is null)
                 return;
 

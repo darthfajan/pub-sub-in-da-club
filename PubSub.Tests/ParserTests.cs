@@ -1,4 +1,5 @@
 ﻿using FluentAssertions;
+using PubSub.Shared;
 using PubSub.Shared.TCP;
 using System;
 using System.Collections.Generic;
@@ -11,13 +12,15 @@ namespace PubSub.Tests
     [TestClass]
     public class ParserTests
     {
+        TCPMessageParser _parser = new TCPMessageParser();
+       
         [TestMethod]
         public void Publish_message_should_be_created_correctly()
         {
             var message = "test message";
             var channel = "testChannel";
 
-            string encodedMessage = TCPMessageParser.CreatePublishMessage(channel, message);
+            string encodedMessage = _parser.CreatePublishMessage(channel, message);
             encodedMessage.Should().Be($"{TCPMessageParser.PublishEncoding}{TCPMessageParser.EncodingSeparator}{channel.ToUpperInvariant()}{TCPMessageParser.EncodingSeparator}{message}{TCPMessageParser.EndEncoodingTerminator}"); // P|CHANNEL|message\r\n
         }
 
@@ -26,9 +29,9 @@ namespace PubSub.Tests
         {
             var channel = "testChannel";
 
-            string encodedMessage = TCPMessageParser.CreatePublishMessage(channel, null);
+            string encodedMessage = _parser.CreatePublishMessage(channel, null);
             encodedMessage.Should().Be(string.Empty);
-            encodedMessage = TCPMessageParser.CreatePublishMessage(channel, string.Empty);
+            encodedMessage = _parser.CreatePublishMessage(channel, string.Empty);
             encodedMessage.Should().Be(string.Empty);
         }
 
@@ -37,9 +40,9 @@ namespace PubSub.Tests
         {
             var message = "test";
 
-            string encodedMessage = TCPMessageParser.CreatePublishMessage(null, message);
+            string encodedMessage = _parser.CreatePublishMessage(null, message);
             encodedMessage.Should().Be(string.Empty);
-            encodedMessage = TCPMessageParser.CreatePublishMessage(string.Empty, message);
+            encodedMessage = _parser.CreatePublishMessage(string.Empty, message);
             encodedMessage.Should().Be(string.Empty);
         }
 
@@ -50,9 +53,9 @@ namespace PubSub.Tests
             var channel = "testChannel";
             var encodedMessage = $"{TCPMessageParser.PublishEncoding}{TCPMessageParser.EncodingSeparator}{channel.ToUpperInvariant()}{TCPMessageParser.EncodingSeparator}{message}{TCPMessageParser.EndEncoodingTerminator}";
 
-            MessageInfo decodedMessage = TCPMessageParser.Decode(encodedMessage);
+            IMessageInfo decodedMessage = _parser.Decode(encodedMessage);
             decodedMessage.MessageType.Should().Be(MessageType.Publish); 
-            decodedMessage.Message.Should().Be(message); 
+            decodedMessage.Content.Should().Be(message); 
             decodedMessage.Channel.Should().Be(channel.ToUpperInvariant()); 
         }
 
@@ -62,7 +65,7 @@ namespace PubSub.Tests
             var message = "test message";
             var encodedMessage = $"{TCPMessageParser.PublishEncoding}{TCPMessageParser.EncodingSeparator}{message}{TCPMessageParser.EndEncoodingTerminator}";
 
-            MessageInfo decodedMessage = TCPMessageParser.Decode(encodedMessage);
+            IMessageInfo decodedMessage = _parser.Decode(encodedMessage);
             decodedMessage.Should().BeNull();
         }
 
@@ -71,7 +74,7 @@ namespace PubSub.Tests
         {
             var channel = "testChannel";
 
-            string encodedMessage = TCPMessageParser.CreateSubscribeMessage(channel);
+            string encodedMessage = _parser.CreateSubscribeMessage(channel);
             encodedMessage.Should().Be($"{TCPMessageParser.SubscribeEncoding}{TCPMessageParser.EncodingSeparator}{channel.ToUpperInvariant()}{TCPMessageParser.EncodingSeparator}{TCPMessageParser.EndEncoodingTerminator}"); // S|CHANNEL|\r\n
         }
 
@@ -81,9 +84,9 @@ namespace PubSub.Tests
             var channel = "testChannel";
             var encodedMessage = $"{TCPMessageParser.SubscribeEncoding}{TCPMessageParser.EncodingSeparator}{channel.ToUpperInvariant()}{TCPMessageParser.EncodingSeparator}{TCPMessageParser.EndEncoodingTerminator}";
 
-            MessageInfo decodedMessage = TCPMessageParser.Decode(encodedMessage);
+            IMessageInfo decodedMessage = _parser.Decode(encodedMessage);
             decodedMessage.MessageType.Should().Be(MessageType.Subscribe);
-            decodedMessage.Message.Should().Be(string.Empty);
+            decodedMessage.Content.Should().Be(string.Empty);
             decodedMessage.Channel.Should().Be(channel.ToUpperInvariant());
         }
 
@@ -93,7 +96,7 @@ namespace PubSub.Tests
             var message = "test message";
             var channel = "testChannel";
 
-            string encodedMessage = TCPMessageParser.CreateContentMessage(channel, message);
+            string encodedMessage = _parser.CreateContentMessage(channel, message);
             encodedMessage.Should().Be($"{TCPMessageParser.ContentEncoding}{TCPMessageParser.EncodingSeparator}{channel.ToUpperInvariant()}{TCPMessageParser.EncodingSeparator}{message}{TCPMessageParser.EndEncoodingTerminator}"); // C|CHANNEL|message\r\n
         }
 
@@ -104,16 +107,16 @@ namespace PubSub.Tests
             var channel = "testChannel";
             var encodedMessage = $"{TCPMessageParser.ContentEncoding}{TCPMessageParser.EncodingSeparator}{channel.ToUpperInvariant()}{TCPMessageParser.EncodingSeparator}{message}{TCPMessageParser.EndEncoodingTerminator}";
 
-            MessageInfo decodedMessage = TCPMessageParser.Decode(encodedMessage);
+            IMessageInfo decodedMessage = _parser.Decode(encodedMessage);
             decodedMessage.MessageType.Should().Be(MessageType.Content);
-            decodedMessage.Message.Should().Be(message);
+            decodedMessage.Content.Should().Be(message);
             decodedMessage.Channel.Should().Be(channel.ToUpperInvariant());
         }
 
         [TestMethod]
         public void Ack_message_should_be_created_correctly()
         {
-            string encodedMessage = TCPMessageParser.CreateAckMessage();
+            string encodedMessage = _parser.CreateAckMessage();
             encodedMessage.Should().Be($"{TCPMessageParser.ACKEncoding}{TCPMessageParser.EncodingSeparator}{TCPMessageParser.EncodingSeparator}{TCPMessageParser.EndEncoodingTerminator}"); // A||\r\n
         }
 
@@ -122,16 +125,16 @@ namespace PubSub.Tests
         {
             var encodedMessage = $"{TCPMessageParser.ACKEncoding}{TCPMessageParser.EncodingSeparator}{TCPMessageParser.EncodingSeparator}{TCPMessageParser.EndEncoodingTerminator}";
 
-            MessageInfo decodedMessage = TCPMessageParser.Decode(encodedMessage);
+            IMessageInfo decodedMessage = _parser.Decode(encodedMessage);
             decodedMessage.MessageType.Should().Be(MessageType.Ack);
-            decodedMessage.Message.Should().Be(string.Empty);
+            decodedMessage.Content.Should().Be(string.Empty);
             decodedMessage.Channel.Should().Be(string.Empty);
         }
 
         [TestMethod]
         public void Error_message_should_be_created_correctly()
         {
-            string encodedMessage = TCPMessageParser.CreateErrorMessage();
+            string encodedMessage = _parser.CreateErrorMessage();
             encodedMessage.Should().Be($"{TCPMessageParser.ErrorEncoding}{TCPMessageParser.EncodingSeparator}{TCPMessageParser.EncodingSeparator}{TCPMessageParser.EndEncoodingTerminator}"); // A||\r\n
         }
 
@@ -140,9 +143,9 @@ namespace PubSub.Tests
         {
             var encodedMessage = $"{TCPMessageParser.ErrorEncoding}{TCPMessageParser.EncodingSeparator}{TCPMessageParser.EncodingSeparator}{TCPMessageParser.EndEncoodingTerminator}";
 
-            MessageInfo decodedMessage = TCPMessageParser.Decode(encodedMessage);
+            IMessageInfo decodedMessage = _parser.Decode(encodedMessage);
             decodedMessage.MessageType.Should().Be(MessageType.Error);
-            decodedMessage.Message.Should().Be(string.Empty);
+            decodedMessage.Content.Should().Be(string.Empty);
             decodedMessage.Channel.Should().Be(string.Empty);
         }
     }

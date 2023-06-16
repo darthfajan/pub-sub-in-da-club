@@ -1,5 +1,6 @@
 ﻿using FluentAssertions;
 using PubSub.Server.TCPServer;
+using PubSub.Shared;
 using PubSub.Shared.TCP;
 using System;
 using System.Collections.Generic;
@@ -12,6 +13,8 @@ namespace PubSub.Tests
 {
     internal static class TCPClientExtensions
     {
+        static TCPMessageParser s_parser = new TCPMessageParser();
+
         public static void CheckAck(this TcpClient client)
         {
             client.ReceiveBufferSize.Should().BeGreaterThan(0);
@@ -19,13 +22,13 @@ namespace PubSub.Tests
             client.GetStream().Read(received, 0, client.ReceiveBufferSize);
 
             var receivedString = Encoding.UTF8.GetString(received);
-            var decodedMessage = TCPMessageParser.Decode(receivedString);
+            var decodedMessage = s_parser.Decode(receivedString);
             decodedMessage.MessageType.Should().Be(MessageType.Ack);
         }
 
         public static void SendPublish(this TcpClient client, string channel, string content)
         {
-            var sendingBytes = Encoding.UTF8.GetBytes(TCPMessageParser.CreatePublishMessage(channel, content));
+            var sendingBytes = Encoding.UTF8.GetBytes(s_parser.CreatePublishMessage(channel, content));
             client.GetStream().Write(sendingBytes, 0, sendingBytes.Length);
         }
 
@@ -38,7 +41,7 @@ namespace PubSub.Tests
 
         public static void SendSubscription(this TcpClient client, string channel)
         {
-            var sendingBytes = Encoding.UTF8.GetBytes(TCPMessageParser.CreateSubscribeMessage(channel));
+            var sendingBytes = Encoding.UTF8.GetBytes(s_parser.CreateSubscribeMessage(channel));
             client.GetStream().Write(sendingBytes, 0, sendingBytes.Length);
         }
 
@@ -48,9 +51,9 @@ namespace PubSub.Tests
             byte[] received = new byte[client.ReceiveBufferSize];
             client.GetStream().Read(received, 0, client.ReceiveBufferSize);
             var receivedString = Encoding.UTF8.GetString(received);
-            var decodedMessage = TCPMessageParser.Decode(receivedString);
+            var decodedMessage = s_parser.Decode(receivedString);
             decodedMessage.MessageType.Should().Be(MessageType.Content);
-            decodedMessage.Message.Should().Be(content);
+            decodedMessage.Content.Should().Be(content);
         }
     }
 }

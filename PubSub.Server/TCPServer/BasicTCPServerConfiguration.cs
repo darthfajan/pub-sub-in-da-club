@@ -10,5 +10,6 @@ namespace PubSub.Server.TCPServer
     {
         public int Port { get; set; } = ConnectionDefaults.StandardPort;
         public IPubSubLogger Logger { get; set; }
+        public IMessageParser Parser { get; set; } = new TCPMessageParser();
     }
 }

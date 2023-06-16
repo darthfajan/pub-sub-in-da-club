@@ -18,5 +18,9 @@ namespace PubSub.Server
         /// Eventual logger for debug purpose
         /// </summary>
         IPubSubLogger Logger { get; set; }
+        /// <summary>
+        /// Exchanged message parser
+        /// </summary>
+        IMessageParser Parser { get; set; }
     }
 }

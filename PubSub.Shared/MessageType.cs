@@ -1,8 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using PubSub.Shared.TCP;
 
-namespace PubSub.Shared.TCP
+namespace PubSub.Shared
 {
     public enum MessageType
     {
@@ -36,8 +37,8 @@ namespace PubSub.Shared.TCP
 
         public static MessageType Decoded(this string encodedType)
         {
-            if(encodedType.Equals(TCPMessageParser.PublishEncoding.ToString()))
-                    return MessageType.Publish;
+            if (encodedType.Equals(TCPMessageParser.PublishEncoding.ToString()))
+                return MessageType.Publish;
             if (encodedType.Equals(TCPMessageParser.SubscribeEncoding.ToString()))
                 return MessageType.Subscribe;
             if (encodedType.Equals(TCPMessageParser.ContentEncoding.ToString()))

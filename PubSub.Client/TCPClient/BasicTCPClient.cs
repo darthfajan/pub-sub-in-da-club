@@ -17,6 +17,7 @@ namespace PubSub.Client.TCPClient
         private bool _disposed;
         IPEndPoint _serverEndPoint;
         private IPubSubLogger _logger;
+        private IMessageParser _parser;
         private BasicTCPClientConfiguration _configuration;
         private CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();
         private ConcurrentDictionary<string,List<IChannelSubscriber>> _subscriptions = new ConcurrentDictionary<string, List<IChannelSubscriber>>();
@@ -26,6 +27,7 @@ namespace PubSub.Client.TCPClient
             _configuration = new BasicTCPClientConfiguration();
             configuration?.Invoke(_configuration);
             _logger = _configuration.Logger;
+            _parser = _configuration.Parser;
 
             IPHostEntry ipHostInfo = Dns.GetHostEntry(_configuration.Host);
             IPAddress ipAddress = ipHostInfo.AddressList.FirstOrDefault(x => x.AddressFamily == AddressFamily.InterNetwork);
@@ -58,7 +60,7 @@ namespace PubSub.Client.TCPClient
                     if (!publishingClient.Connected)
                         return false;
 
-                    var encodedMessage = TCPMessageParser.CreatePublishMessage(channel, message);
+                    var encodedMessage = _parser.CreatePublishMessage(channel, message);
                     if (encodedMessage is null)
                         return false;
 
@@ -107,7 +109,7 @@ namespace PubSub.Client.TCPClient
                 return false;
             }
 
-            string message = TCPMessageParser.CreateSubscribeMessage(channel);
+            string message = _parser.CreateSubscribeMessage(channel);
             if (message is null)
             {
                 subscription.Close();
@@ -132,12 +134,12 @@ namespace PubSub.Client.TCPClient
             return true;
         }
 
-        private MessageInfo WaitForNextMessage(Socket subscription)
+        private IMessageInfo WaitForNextMessage(Socket subscription)
         {
             var received = new byte[subscription.ReceiveBufferSize];
             subscription.Receive(received, SocketFlags.None);
             var receivedString = Encoding.UTF8.GetString(received);
-            return TCPMessageParser.Decode(receivedString);
+            return _parser.Decode(receivedString);
         }
 
         private void ManageSubscription(string channel, Socket client)
@@ -153,7 +155,7 @@ namespace PubSub.Client.TCPClient
                 {
                     if(_subscriptions.TryGetValue(channel, out var subscribers))
                     {
-                        Task.Run(() => subscribers.ForEach(subscriber => subscriber.OnMessage(message.Channel, message.Message)));
+                        Task.Run(() => subscribers.ForEach(subscriber => subscriber.OnMessage(message.Channel, message.Content)));
                     }
                 }
             }
