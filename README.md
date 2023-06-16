@@ -8,7 +8,7 @@ The exchange protocol respect the following sequence diagrams:
 * ![Publish messages exchange](/publish.png "Publish exchange")
 
 An example of utilization can be found in the only **integration test** present in the **PubSub.Tests** project.
-You can finde also a simple console app for server and client under the **Executables** folder.
+You can find also a simple console app for server and client under the **Executables** folder.
 * ![Publish messages exchanege](/programExample.png "Publish exchange")
 
 # Build
