@@ -4,10 +4,11 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace PubSub.Server.TCPServer
+namespace PubSub.Client.TCPClient
 {
-    internal class BasicTCPServerConfiguration : IChannelServerConfiguration
+    internal class BasicTCPClientConfiguration : IClientConfigurationSettings
     {
+        public string Host { get; set; } = "localhost";
         public int Port { get; set; } = ConnectionDefaults.StandardPort;
         public IPubSubLogger Logger { get; set; }
     }

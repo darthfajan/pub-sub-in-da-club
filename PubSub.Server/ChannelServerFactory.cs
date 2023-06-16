@@ -20,14 +20,20 @@ namespace PubSub.Server
             s_serverTypes[communicationType] = type;
         }
 
-        public static IChannelServer CreateServer(CommunicationType communicationType = CommunicationType.BasicTCP, Action<IChannelServerConfiguration> configuration = null)
+        public static IChannelServer CreateServer(CommunicationType communicationType = CommunicationType.BasicTCP, Action<IChannelServerConfiguration> configurationAction = null)
         {
             if (!s_serverTypes.TryGetValue(communicationType, out var serverType))
             {
                 return null;
             }
-
-            return (IChannelServer)Activator.CreateInstance(serverType, new[] { configuration });
+            try
+            {
+                return (IChannelServer)Activator.CreateInstance(serverType, new[] { configurationAction });
+            }
+            catch
+            {
+                return null;
+            }
         }
     }
 }

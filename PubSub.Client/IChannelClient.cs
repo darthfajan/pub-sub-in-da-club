@@ -5,9 +5,9 @@ using System.Text;
 
 namespace PubSub.Client
 {
-    public interface IChannelClient
+    public interface IChannelClient : IDisposable
     {
-        bool Subscribe(string channel, IChannelSubscriber subscriber);
-        void Publish(string channel, IMessage message);
+        bool Subscribe(string channel, IChannelSubscriber messageReceived);
+        bool Publish(string channel, string message);
     }
 }

@@ -227,7 +227,7 @@ namespace PubSub.Tests
             bool loggerCalled = false;
             var loggerMoq = new Mock<IPubSubLogger>();
             loggerMoq.Setup(p => p.Info(It.IsAny<string>())).Callback(() => loggerCalled = true);
-            using var server = ChannelServerFactory.CreateServer(configuration: cfg =>
+            using var server = ChannelServerFactory.CreateServer(configurationAction: cfg =>
             {
                 cfg.Logger = loggerMoq.Object;
             });

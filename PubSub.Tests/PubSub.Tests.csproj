@@ -18,6 +18,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\PubSub.Client\PubSub.Client.csproj" />
     <ProjectReference Include="..\PubSub.Server\PubSub.Server.csproj" />
     <ProjectReference Include="..\PubSub.Shared\PubSub.Shared.csproj" />
   </ItemGroup>

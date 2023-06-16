@@ -30,7 +30,7 @@ namespace PubSub.Tests
         }
 
 
-        public static void CheckConnection(this TcpClient client, string host, int port = BasicTCPServerConfiguration.StandardPort)
+        public static void CheckConnection(this TcpClient client, string host, int port = ConnectionDefaults.StandardPort)
         {
             client.Connect(host, port);
             client.Connected.Should().BeTrue();

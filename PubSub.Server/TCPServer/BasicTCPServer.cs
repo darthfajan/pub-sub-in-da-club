@@ -87,65 +87,85 @@ namespace PubSub.Server.TCPServer
             string plainMessage = string.Empty;
             while (!_cancellationTokenSource.Token.IsCancellationRequested)
             {
-                var dataBuffer = new byte[1024];
-                var numOfBytes = clientSocket.Receive(dataBuffer, SocketFlags.None);
-                plainMessage += Encoding.UTF8.GetString(dataBuffer, 0, numOfBytes);
-
-                if (numOfBytes <= 0)
+                try
                 {
-                    // The connection has been interruped by the client
-                    _logger?.Info($"Client[{handle}] disconnected");
+                    var dataBuffer = new byte[1024];
+                    var numOfBytes = clientSocket.Receive(dataBuffer, SocketFlags.None);
+                    plainMessage += Encoding.UTF8.GetString(dataBuffer, 0, numOfBytes);
+
+                    if (numOfBytes <= 0)
+                    {
+                        // The connection has been interruped by the client
+                        _logger?.Info($"Client[{handle}] disconnected");
+
+                        break;
+                    }
+
+                    var messageTerminator = "\r\n";
+                    if (plainMessage.IndexOf(messageTerminator) > -1)
+                    {
+                        // The message is complete
+                        if (plainMessage.IndexOf('\0') > -1)
+                            plainMessage = plainMessage.Substring(0, plainMessage.IndexOf('\0'));
+
+                        _logger?.Info($"Received message: {plainMessage} from Client[{handle}]");
+                        var decodedMessage = TCPMessageParser.Decode(plainMessage);
+                        if (decodedMessage != null)
+                        {
+                            lock (_lockChannels)
+                            {
+                                if (!_channels.ContainsKey(decodedMessage.Channel))
+                                {
+                                    _channels[decodedMessage.Channel] = new List<Socket>();
+                                    _lockObjects[decodedMessage.Channel] = new object();
+                                }
+                            }
+
+                            if (!_channels.TryGetValue(decodedMessage.Channel, out var subscribers))
+                                continue;
+
+                            if (decodedMessage.MessageType == MessageType.Publish)
+                            {
+                                // I have to publish to the subscription list
+                                lock (_lockObjects[decodedMessage.Channel])
+                                {
+                                    subscribers.ForEach(x => SendContentMessage(decodedMessage, x));
+                                }
+                            }
+                            else if (decodedMessage.MessageType == MessageType.Subscribe)
+                            {
+                                lock (_lockObjects[decodedMessage.Channel])
+                                {
+                                    // I have to register it if it wasn't already registered
+                                    if (!subscribers.Contains(clientSocket))
+                                        subscribers.Add(clientSocket);
+                                }
+                            }
+                            SendAckMessage(clientSocket);
+                        }
+                        else
+                        {
+                            SendErrorMessage(clientSocket);
+                        }
+                        // reset the message info
+                        plainMessage = string.Empty;
+                    }
+                }
+                catch (Exception exception)
+                {
+                    // TODO: enable log level?
+                    _logger?.Error($"Exception with connection with Client[{handle}]. Message {exception}");
                     break;
                 }
+            }
 
-                var messageTerminator = "\r\n";
-                if (plainMessage.IndexOf(messageTerminator) > -1)
+            lock (_lockChannels)
+            {
+                foreach (var clients in _channels.Values)
                 {
-                    // The message is complete
-                    if (plainMessage.IndexOf('\0') > -1)
-                        plainMessage = plainMessage.Substring(0, plainMessage.IndexOf('\0'));
-
-                    _logger?.Info($"Received message: {plainMessage} from Client[{handle}]");
-                    var decodedMessage = TCPMessageParser.Decode(plainMessage);
-                    if (decodedMessage != null)
-                    {
-                        lock(_lockChannels)
-                        {
-                            if (!_channels.ContainsKey(decodedMessage.Channel))
-                            {
-                                _channels[decodedMessage.Channel] = new List<Socket>();
-                                _lockObjects[decodedMessage.Channel] = new object();
-                            }
-                        }
-
-                        if (!_channels.TryGetValue(decodedMessage.Channel, out var subscribers))
-                            continue;
-
-                        if (decodedMessage.MessageType == MessageType.Publish)
-                        {
-                            // I have to publish to the subscription list
-                            lock (_lockObjects[decodedMessage.Channel])
-                            {
-                                subscribers.ForEach(x => SendContentMessage(decodedMessage, x));
-                            }
-                        }
-                        else if (decodedMessage.MessageType == MessageType.Subscribe)
-                        {
-                            lock (_lockObjects[decodedMessage.Channel])
-                            {
-                                // I have to register it if it wasn't already registered
-                                if (!subscribers.Contains(clientSocket))
-                                    subscribers.Add(clientSocket);
-                            }
-                        }
-                        SendAckMessage(clientSocket);
-                    }
-                    else
-                    {
-                        SendErrorMessage(clientSocket);
-                    }
-                    // reset the message info
-                    plainMessage = string.Empty;
+                    clientSocket.Close();
+                    clientSocket.Dispose();
+                    clients.Remove(clientSocket);
                 }
             }
         }
